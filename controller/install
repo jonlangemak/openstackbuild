@@ -164,10 +164,8 @@ apt-get install nova-api nova-cert nova-conductor nova-consoleauth nova-novncpro
 mysql -u root -p
 
 CREATE DATABASE nova;
-GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'localhost' \
-  IDENTIFIED BY 'nova;
-GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'%' \
-  IDENTIFIED BY 'nova';
+GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'localhost' IDENTIFIED BY 'nova';
+GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'%' IDENTIFIED BY 'nova';
 quit;
 
 !Create the keystone users and endpoints
@@ -180,11 +178,53 @@ openstack endpoint create --region RegionOne compute public http://controller:87
 openstack endpoint create --region RegionOne compute internal http://controller:8774/v2/%\(tenant_id\)s
 openstack endpoint create --region RegionOne compute admin http://controller:8774/v2/%\(tenant_id\)s
 
+!Edit the nova.conf file - /etc/nova/nova.conf
 
+!Populate the database
+/bin/sh -c "nova-manage db sync" nova
 
+!Restart the services
+service nova-api restart
+service nova-cert restart
+service nova-consoleauth restart
+service nova-scheduler restart
+service nova-conductor restart
+service nova-novncproxy restart
 
+!Remove the sql lite DB
+rm -f /var/lib/nova/nova.sqlite
 
+!Configure Horizon
+apt-get install openstack-dashboard
 
+!Place config file - /etc/openstack-dashboard/local_settings.py
+
+!Restart web server
+service apache2 reload
+
+!Configure Neutron
+
+!Configure database
+mysql -u root -p
+
+CREATE DATABASE neutron;
+GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'localhost' IDENTIFIED BY 'neutron';
+GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'%' IDENTIFIED BY 'neutron';
+quit;
+
+!Create Neutron service
+source ~/adminrc
+
+openstack user create --domain default neutron --password=neutron
+openstack role add --project service --user neutron admin
+openstack service create --name neutron --description "OpenStack Networking" network
+openstack endpoint create --region RegionOne network public http://controller:9696
+openstack endpoint create --region RegionOne network internal http://controller:9696
+openstack endpoint create --region RegionOne network admin http://controller:9696
+
+apt-get install neutron-server neutron-plugin-ml2 \
+  neutron-plugin-linuxbridge-agent neutron-l3-agent neutron-dhcp-agent \
+  neutron-metadata-agent python-neutronclient conntrack
 
 
 
