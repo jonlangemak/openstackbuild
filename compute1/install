@@ -1,0 +1,10 @@
+!Install packages
+apt-get install nova-compute sysfsutils
+
+!Put in the config file /etc/nova/nova.conf
+
+!Restart the service
+service nova-compute restart
+
+!Remove unused sqlilite DB
+rm -f /var/lib/nova/nova.sqlite

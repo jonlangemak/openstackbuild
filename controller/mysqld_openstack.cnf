@@ -1,0 +1,9 @@
+[mysqld]
+#*LOOKHERE* Change this to refect the mgmt IP address of your controller
+bind-address = 10.20.30.30
+
+default-storage-engine = innodb
+innodb_file_per_table
+collation-server = utf8_general_ci
+init-connect = "SET NAMES utf8"
+character-set-server = utf8
