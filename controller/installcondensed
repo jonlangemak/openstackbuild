@@ -1,11 +1,20 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!****BASE SYSTEM CONFIGURATION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !Disable KeyStone from starting automatitcally
 echo "manual" > /etc/init/keystone.override
 
 !install packages
 !Set mariadb password to 'openstack' during install
-apt-get install mariadb-server python-mysqldb keystone python-openstackclient apache2 libapache2-mod-wsgi memcached python-memcache rabbitmq-server
+apt-get install mariadb-server python-mysqldb keystone python-openstackclient \
+apache2 libapache2-mod-wsgi memcached python-memcache rabbitmq-server \
+glance python-glanceclient nova-api nova-cert nova-conductor nova-consoleauth \
+nova-novncproxy nova-scheduler python-novaclient openstack-dashboard \
+neutron-server neutron-plugin-ml2 neutron-plugin-linuxbridge-agent \
+neutron-l3-agent neutron-dhcp-agent neutron-metadata-agent \
+python-neutronclient conntrack
 
-!Configure MySQL
+!Configure MySQL and RabbitMQ
 !Place config file /etc/mysql/conf.d/mysqld_openstack.cnf
 
 !Restart MySQL
@@ -14,26 +23,34 @@ service mysql restart
 !Run the MySQL secure install utility, answer Y to all questions
 mysql_secure_installation
 
-!Add a RabbitMQ user called openstack
+!Add a RabbitMQ user called openstack and set permissions
 rabbitmqctl add_user openstack rabbit
-
-!Set permissions for the openstack user
 rabbitmqctl set_permissions openstack ".*" ".*" ".*"
 
-!Configure KeyStone
-!Place config file /etc/keystone/keystone.conf
-
-!Needed?
-!Remove the default SQLLite database
-rm -f /var/lib/keystone/keystone.db
-
-!Create the Keystone database
-mysql -u root -p
-
+!Create all required databases
+mysql -u root --password=openstack
+!Keystone
 CREATE DATABASE keystone;
 GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY 'keystone';
 GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'keystone';
+!Glance
+CREATE DATABASE glance;
+GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'localhost' IDENTIFIED BY 'glance';
+GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY 'glance';
+!Nova
+CREATE DATABASE nova;
+GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'localhost' IDENTIFIED BY 'nova';
+GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'%' IDENTIFIED BY 'nova';
+!Neutron
+CREATE DATABASE neutron;
+GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'localhost' IDENTIFIED BY 'neutron';
+GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'%' IDENTIFIED BY 'neutron';
 quit;
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!****CONFIGURE KEYSTONE
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!Install Config file - /etc/keystone/keystone.conf
 
 !Populate the keystone database
 /bin/sh -c "keystone-manage db_sync" keystone
@@ -41,18 +58,10 @@ quit;
 !Change the servername to match the localhost name
 sed -i '1s/^/ServerName controller\n&/' /etc/apache2/apache2.conf
 
-!Create and install config file /etc/apache2/sites-available/wsgi-keystone.conf
+!Install Config file - /etc/apache2/sites-available/wsgi-keystone.conf
 
 !Enable virtual hosts
 ln -s /etc/apache2/sites-available/wsgi-keystone.conf /etc/apache2/sites-enabled
-
-!NOT NEEDED?
-!!Download WSGI components
-!mkdir -p /var/www/cgi-bin/keystone
-!curl http://git.openstack.org/cgit/openstack/keystone/plain/httpd/keystone.py?h=stable/liberty | tee /var/www/cgi-bin/keystone/main /var/www/cgi-bin/keystone/admin
-!!Set permissions
-!chown -R keystone:keystone /var/www/cgi-bin/keystone 
-!chmod 755 /var/www/cgi-bin/keystone/*
 
 !Restart Apache
 service apache2 restart
@@ -86,8 +95,15 @@ openstack role add --project demo --user demo user
 
 !Test
 unset OS_TOKEN OS_URL
-openstack --os-auth-url http://controller:35357/v3 --os-project-domain-id default --os-user-domain-id default --os-project-name admin --os-username admin --os-password openstack --os-auth-type password token issue
-openstack --os-auth-url http://controller:35357/v3 --os-project-domain-id default --os-user-domain-id default --os-project-name demo --os-username demo --os-password demo --os-auth-type password token issue
+
+!Issue tokens
+openstack --os-auth-url http://controller:35357/v3 --os-project-domain-id default \
+--os-user-domain-id default --os-project-name admin --os-username admin \
+--os-password openstack --os-auth-type password token issue
+
+openstack --os-auth-url http://controller:35357/v3 --os-project-domain-id default \
+--os-user-domain-id default --os-project-name demo --os-username demo \
+--os-password demo --os-auth-type password token issue
 
 !Test this to make sure you get output
 openstack --os-auth-url http://controller:35357 \
@@ -103,6 +119,7 @@ export OS_TENANT_NAME=admin
 export OS_USERNAME=admin
 export OS_PASSWORD=openstack
 export OS_AUTH_URL=http://controller:35357/v3
+export OS_IDENTITY_API_VERSION=3
 EOF
 
 !Create Demo source file
@@ -114,30 +131,23 @@ export OS_TENANT_NAME=demo
 export OS_USERNAME=demo
 export OS_PASSWORD=demo
 export OS_AUTH_URL=http://controller:5000/v3
+export OS_IDENTITY_API_VERSION=3
 EOF
 
-!Install image service
-apt-get install glance python-glanceclient
-
-mysql -u root -p
-CREATE DATABASE glance;
-GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'localhost' IDENTIFIED BY 'glance';
-GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY 'glance';
-quit;
-
-!Create gance user
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!****CONFIGURE GLANCE
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!Create Glance user, roles, services, and endpoints
 source ~/adminrc 
 openstack user create --domain default glance --password=glance
 openstack role add --project service --user glance admin
 openstack service create --name glance --description "OpenStack Image service" image
-
-!Create API endpoints
 openstack endpoint create --region RegionOne image public http://controller:9292
 openstack endpoint create --region RegionOne image internal http://controller:9292
 openstack endpoint create --region RegionOne image admin http://controller:9292
 
-!Edit the glance-api.conf file - /etc/glance/glance-api.conf
-!Edit the glance-registry.conf file - /etc/glance/glance-registry.conf
+!Install Config file - /etc/glance/glance-api.conf
+!Install Config file - /etc/glance/glance-registry.conf
 
 !Populate the image service DB
 /bin/sh -c "glance-manage db_sync" glance
@@ -148,27 +158,19 @@ service glance-api restart
 
 !Verify installation
 echo "export OS_IMAGE_API_VERSION=2" | tee -a admin-openrc.sh demo-openrc.sh
-~/source adminrc
+source ~/adminrc
 mkdir /tmp/images
 wget -P /tmp/images http://download.cirros-cloud.net/0.3.4/cirros-0.3.4-x86_64-disk.img
 
- glance image-create --name "cirros" \
-  --file /tmp/images/cirros-0.3.4-x86_64-disk.img \
-  --disk-format qcow2 --container-format bare \
-  --visibility public --progress
+glance image-create --name "cirros" \
+--file /tmp/images/cirros-0.3.4-x86_64-disk.img \
+--disk-format qcow2 --container-format bare \
+--visibility public --progress
 
-!Nova Compute
-apt-get install nova-api nova-cert nova-conductor nova-consoleauth nova-novncproxy nova-scheduler python-novaclient
-
-!Create database
-mysql -u root -p
-
-CREATE DATABASE nova;
-GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'localhost' IDENTIFIED BY 'nova';
-GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'%' IDENTIFIED BY 'nova';
-quit;
-
-!Create the keystone users and endpoints
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!****CONFIGURE NOVA
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!Create Nova user, roles, services, and endpoints
 source ~/adminrc
 openstack user create --domain default nova --password=nova
 openstack role add --project service --user nova admin
@@ -178,7 +180,7 @@ openstack endpoint create --region RegionOne compute public http://controller:87
 openstack endpoint create --region RegionOne compute internal http://controller:8774/v2/%\(tenant_id\)s
 openstack endpoint create --region RegionOne compute admin http://controller:8774/v2/%\(tenant_id\)s
 
-!Edit the nova.conf file - /etc/nova/nova.conf
+!Install Config file - /etc/nova/nova.conf
 
 !Populate the database
 /bin/sh -c "nova-manage db sync" nova
@@ -191,30 +193,19 @@ service nova-scheduler restart
 service nova-conductor restart
 service nova-novncproxy restart
 
-!Remove the sql lite DB
-rm -f /var/lib/nova/nova.sqlite
-
-!Configure Horizon
-apt-get install openstack-dashboard
-
-!Place config file - /etc/openstack-dashboard/local_settings.py
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!****CONFIGURE HORIZON
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!Install Config file - /etc/openstack-dashboard/local_settings.py
 
 !Restart web server
 service apache2 reload
 
-!Configure Neutron
-
-!Configure database
-mysql -u root -p
-
-CREATE DATABASE neutron;
-GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'localhost' IDENTIFIED BY 'neutron';
-GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'%' IDENTIFIED BY 'neutron';
-quit;
-
-!Create Neutron service
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!****CONFIGURE NEUTRON
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!Create Neutron user, roles, services, and endpoints
 source ~/adminrc
-
 openstack user create --domain default neutron --password=neutron
 openstack role add --project service --user neutron admin
 openstack service create --name neutron --description "OpenStack Networking" network
@@ -222,22 +213,18 @@ openstack endpoint create --region RegionOne network public http://controller:96
 openstack endpoint create --region RegionOne network internal http://controller:9696
 openstack endpoint create --region RegionOne network admin http://controller:9696
 
-apt-get install neutron-server neutron-plugin-ml2 \
-  neutron-plugin-linuxbridge-agent neutron-l3-agent neutron-dhcp-agent \
-  neutron-metadata-agent python-neutronclient conntrack
-
-!Put neutron config file on controller - /etc/neutron/neutron.conf 
-!Put ml2 config file on controller - /etc/neutron/plugins/ml2/ml2_conf.ini
-!Place the linux bridge agent file - /etc/neutron/plugins/ml2/linuxbridge_agent.ini
-!Place the L3 agent file -  /etc/neutron/l3_agent.ini
-!Place the dhcp agent file - /etc/neutron/dhcp_agent.ini
-!Place the DNSMASQ config file - /etc/neutron/dnsmasq-neutron.conf
-!Placet the metadata anget file - /etc/neutron/metadata_agent.ini
+!Install Config file - /etc/neutron/neutron.conf 
+!Install Config file - /etc/neutron/plugins/ml2/ml2_conf.ini
+!Install Config file - /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+!Install Config file - /etc/neutron/l3_agent.ini
+!Install Config file - /etc/neutron/dhcp_agent.ini
+!Install Config file - /etc/neutron/dnsmasq-neutron.conf
+!Install Config file - /etc/neutron/metadata_agent.ini
 
 !Populate the database
 /bin/sh -c "neutron-db-manage --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head" neutron
 
-!REstart services
+!Restart services
 service nova-api restart
 service neutron-server restart
 service neutron-plugin-linuxbridge-agent restart
@@ -245,5 +232,7 @@ service neutron-dhcp-agent restart
 service neutron-metadata-agent restart
 service neutron-l3-agent restart
 
-!Remove the databases
+!Remove unneeded SQLLite databases
 rm -f /var/lib/neutron/neutron.sqlite
+rm -f /var/lib/nova/nova.sqlite
+rm -f /var/lib/keystone/keystone.db

@@ -1,28 +1,13 @@
-!Set kernal params
-sysctl -w "net.ipv4.ip_forward=1"
-sysctl -w "net.ipv4.conf.default.rp_filter=0"
-sysctl -w "net.ipv4.conf.all.rp_filter=0"
-
-!Set sattically in - /etc/sysctl.conf
-
 !Install packages
-apt-get install nova-compute sysfsutils
+apt-get install nova-compute sysfsutils neutron-plugin-linuxbridge-agent conntrack
 
-!Put in the config file /etc/nova/nova.conf
+!Install Config file - /etc/nova/nova.conf
+!Install Config file - /etc/neutron/neutron.conf
+!Install Config file - /etc/neutron/plugins/ml2/linuxbridge_agent.ini
 
 !Restart the service
 service nova-compute restart
+service neutron-plugin-linuxbridge-agent restart
 
 !Remove unused sqlilite DB
 rm -f /var/lib/nova/nova.sqlite
-
-!Install packages
-apt-get install neutron-plugin-linuxbridge-agent conntrack
-
-!Place neutron config file - /etc/neutron/neutron.conf
-
-!Restart services
-service nova-compute restart
-service neutron-plugin-linuxbridge-agent restart
-
-!Place Linuxbridge config file - /etc/neutron/plugins/ml2/linuxbridge_agent.ini
