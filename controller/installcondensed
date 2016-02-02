@@ -29,19 +29,15 @@ rabbitmqctl set_permissions openstack ".*" ".*" ".*"
 
 !Create all required databases
 mysql -u root --password=openstack
-!Keystone
 CREATE DATABASE keystone;
 GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'localhost' IDENTIFIED BY 'keystone';
 GRANT ALL PRIVILEGES ON keystone.* TO 'keystone'@'%' IDENTIFIED BY 'keystone';
-!Glance
 CREATE DATABASE glance;
 GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'localhost' IDENTIFIED BY 'glance';
 GRANT ALL PRIVILEGES ON glance.* TO 'glance'@'%' IDENTIFIED BY 'glance';
-!Nova
 CREATE DATABASE nova;
 GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'localhost' IDENTIFIED BY 'nova';
 GRANT ALL PRIVILEGES ON nova.* TO 'nova'@'%' IDENTIFIED BY 'nova';
-!Neutron
 CREATE DATABASE neutron;
 GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'localhost' IDENTIFIED BY 'neutron';
 GRANT ALL PRIVILEGES ON neutron.* TO 'neutron'@'%' IDENTIFIED BY 'neutron';
@@ -83,18 +79,15 @@ openstack endpoint create --region RegionOne identity admin http://controller:35
 openstack project create --domain default --description "Admin Project" admin
 openstack project create --domain default --description "Service Project" service
 openstack project create --domain default --description "Demo Project" demo 
-
 openstack user create --domain default admin --password=openstack
 openstack user create --domain default demo --password=demo
-
 openstack role create admin
 openstack role create user
-
 openstack role add --project admin --user admin admin
 openstack role add --project demo --user demo user
 
 !Test
-unset OS_TOKEN OS_URL
+unset OS_TOKEN OS_URL OS_IDENTITY_API_VERSION
 
 !Issue tokens
 openstack --os-auth-url http://controller:35357/v3 --os-project-domain-id default \
