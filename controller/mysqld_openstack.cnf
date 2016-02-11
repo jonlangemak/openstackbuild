@@ -1,5 +1,5 @@
 [mysqld]
-#*LOOKHERE* Change this to refect the mgmt IP address of your controller
+#**CHANGE THIS IF NEEDED**
 bind-address = 10.20.30.30
 
 default-storage-engine = innodb

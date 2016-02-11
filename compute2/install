@@ -1,13 +1,19 @@
-!Install packages
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!****BASE SYSTEM CONFIGURATION
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#Install packages
 apt-get install nova-compute sysfsutils neutron-plugin-linuxbridge-agent conntrack
 
-!Install Config file - /etc/nova/nova.conf
-!Install Config file - /etc/neutron/neutron.conf
-!Install Config file - /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!****Nova and Neutron configuration
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#Install Config file - /etc/nova/nova.conf
+#Install Config file - /etc/neutron/neutron.conf
+#Install Config file - /etc/neutron/plugins/ml2/linuxbridge_agent.ini
 
-!Restart the service
+#Restart the service
 service nova-compute restart
 service neutron-plugin-linuxbridge-agent restart
 
-!Remove unused sqlilite DB
+#Remove unused sqlilite DB
 rm -f /var/lib/nova/nova.sqlite

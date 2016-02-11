@@ -7,9 +7,10 @@ apt-get install nova-compute sysfsutils neutron-plugin-linuxbridge-agent conntra
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!****Nova and Neutron configuration
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#Install Config file - /etc/nova/nova.conf
-#Install Config file - /etc/neutron/neutron.conf
-#Install Config file - /etc/neutron/plugins/ml2/linuxbridge_agent.ini
+#Install Config file
+curl -o /etc/nova/nova.conf http://tools/openstackbuild/compute1/nova.conf
+curl -o /etc/neutron/neutron.conf http://tools/openstackbuild/compute1/neutron.conf
+curl -o /etc/neutron/plugins/ml2/linuxbridge_agent.ini http://tools/openstackbuild/compute1/linuxbridge_agent.ini
 
 #Restart the service
 service nova-compute restart
